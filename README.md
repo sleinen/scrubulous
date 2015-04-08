@@ -10,7 +10,7 @@ The input file should be generated using these commands:
 
     ceph osd tree
     ceph pg dump
-    foreach osd_host in $osd_hosts
+    for osd_host in $osd_hosts
     do
       ssh $osd_host zgrep scrub '/var/log/ceph/ceph-osd.*.{7,6,5,4,3,2,1}.gz'
     done
