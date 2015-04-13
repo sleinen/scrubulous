@@ -109,6 +109,19 @@ TSTAMP_RE = '(\d\d+-\d\d-\d\d \d\d:\d\d:\d\d)\.(\d+)'
 ##
 SCRUB_RATE_EST = 80e6
 
+class EventLog:
+
+    """A log containing events
+
+    """
+
+    def __init__(
+            self):
+        self.log = dict()
+
+    def add(self, event):
+        self.log[event.time] = event
+
 class CephScrubLogAnalyzer:
 
     """A tool to analyze Ceph scrubbing schedule from logs
@@ -140,8 +153,7 @@ class CephScrubLogAnalyzer:
                 elif scrub_type == SCRUB_DEEP:
                     self.deep_count = self.deep_count+1
                     pg = self.pg[pgid]
-                    self.log[tstamp] \
-                        = ScrubEvent(tstamp, scrub_type=scrub_type, pg=pg)
+                    self.log.add(ScrubEvent(tstamp, scrub_type=scrub_type, pg=pg))
                 self.scrub_count = self.scrub_count+1
                 return True
             return False
@@ -279,7 +291,7 @@ class CephScrubLogAnalyzer:
             return True
 
         self.scrub_count, self.shallow_count, self.deep_count = 0, 0, 0
-        self.log = dict()
+        self.log = EventLog()
         self.osd_to_host = dict()
         self.osd_to_kb_used = dict()
         self.pg = dict()
@@ -299,8 +311,8 @@ class CephScrubLogAnalyzer:
                 sys.stdout.write("?? "+line)
         print("Found %d scrubs, %d deep" % (self.scrub_count, self.deep_count))
         self.add_scrub_start_events()
-        for time in sorted(self.log.keys()):
-            event = self.log[time]
+        for time in sorted(self.log.log.keys()):
+            event = self.log.log[time]
             pg = event.pg
             print(event)
 
@@ -313,14 +325,14 @@ class CephScrubLogAnalyzer:
         if end_event.scrub_type == SCRUB_DEEP:
             pg_size = end_event.pg.bytes
             est_start = end_event.time-est_scrub_duration(pg_size)
-            self.log[est_start] = ScrubEvent(est_start,
-                                             scrub_type=end_event.scrub_type,
-                                             start=True,
-                                             pg=end_event.pg)
+            self.log.add(ScrubEvent(est_start,
+                                    scrub_type=end_event.scrub_type,
+                                    start=True,
+                                    pg=end_event.pg))
 
     def add_scrub_start_events(self):
-        for time in self.log.keys():
-            event = self.log[time]
+        for time in self.log.log.keys():
+            event = self.log.log[time]
             if isinstance(event, ScrubEvent):
                 self.add_scrub_start_event(event)
 
