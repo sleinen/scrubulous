@@ -91,13 +91,21 @@ class EventLog:
 
     def add(self, event):
         if self.log.has_key(event.time):
-            raise Exception()   # TODO: handle multiple events at
-                                # exactly the same time
-        self.log[event.time] = event
+            ev = self.log[event.time]
+            if isinstance(ev, Event):
+                ev = list()
+            ev.append(event)
+        else:
+            self.log[event.time] = event
 
     def forward(self):
         for time in sorted(self.log.keys()):
-            yield self.log[time]
+            ev = self.log[time]
+            if isinstance(ev, Event):
+                yield ev
+            else:
+                for ev in ev:
+                    yield ev
 
 class Event:
 
