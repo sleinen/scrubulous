@@ -91,12 +91,9 @@ class EventLog:
 
     def add(self, event):
         if self.log.has_key(event.time):
-            ev = self.log[event.time]
-            if isinstance(ev, Event):
-                ev = list()
-            ev.append(event)
+            self.log[event.time].append(event)
         else:
-            self.log[event.time] = event
+            self.log[event.time] = list([event])
 
     def forward(self):
         for time in sorted(self.log.keys()):
