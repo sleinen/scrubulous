@@ -37,7 +37,7 @@ from datetime import datetime
 from datetime import timedelta
 
 #LOG = '20150407-scrub-logs.txt'
-LOG = '20150413-112504-scrub-logs.txt'
+LOG = '20150413-181724-scrub-logs.txt'
 
 SCRUB_SHALLOW = 0
 SCRUB_DEEP = 1
