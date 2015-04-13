@@ -57,11 +57,13 @@ class PG:
     def __init__(
             self,
             pgid,
+            objects=0,
             bytes=0,
             up=[],
             acting=[],
             hosts=[]):
         self.pgid = pgid
+        self.objects = objects
         self.bytes = bytes
         self.up = up
         self.acting = acting
@@ -238,7 +240,7 @@ class CephScrubLogAnalyzer:
             if not hasattr(self, 'PG_RE'):
                 self.PG_RE \
                     = re.compile('^([0-9a-f]+\.[0-9a-f]+)\t\d+\t\d+\t\d+\t'
-                                 +'\d+\t(\d+)\t\d+\t\d+\t(\S+)\t'+TSTAMP_RE
+                                 +'(\d+)\t(\d+)\t\d+\t\d+\t(\S+)\t'+TSTAMP_RE
                                  +'\t\d+'+"'"+'\d+\t\d+:\d+\t\[([0-9,]+)\]\t'
                                  +'(\d+)\t\[([0-9,]+)\]\t(\d+)\t\d+'+"'"+'\d+\t'
                                  +TSTAMP_RE+'\t\d+'+"'"+'\d+\t'+TSTAMP_RE+'$'
@@ -247,16 +249,17 @@ class CephScrubLogAnalyzer:
             if not m:
                 return False
             pgid           = m.group(1)
-            bytes          = int(m.group(2))
-            status         = m.group(5)
-            up_set         = parse_osd_set(m.group(6))
-            up_primary     = int(m.group(7))
+            objects        = int(m.group(2))
+            bytes          = int(m.group(3))
+            status         = m.group(6)
+            up_set         = parse_osd_set(m.group(7))
+            up_primary     = int(m.group(8))
             assert(up_set[0] == up_primary)
-            acting_set     = parse_osd_set(m.group(8))
-            acting_primary = int(m.group(9))
+            acting_set     = parse_osd_set(m.group(9))
+            acting_primary = int(m.group(10))
             assert(acting_set[0] == acting_primary)
             hosts          = map(osd_host, acting_set)
-            self.pg[pgid]  = PG(pgid, bytes=bytes,
+            self.pg[pgid]  = PG(pgid, objects=objects, bytes=bytes,
                                 up=up_set, acting=acting_set,
                                 hosts=hosts)
             return True
