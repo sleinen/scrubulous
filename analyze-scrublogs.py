@@ -127,30 +127,9 @@ class CephScrubLogAnalyzer:
         self.log_unknown_lines=log_unknown_lines
 
     def parse(self):
-        self.OSD_LOG_RE = re.compile('^ */var/log/ceph/ceph-osd\.(\d+)\.log(\.\d+(\.gz)?)?:'
-                                     +TSTAMP_RE+'\s+'
-                                     +'([0-9a-f]+)\s+0 log \[(.*)\] : (.*)}?$')
-        self.OSD_LOG_SCRUB_RE = re.compile('(.*) (deep-scrub|scrub) ok')
-        self.OSD_LOG_SLOW_RE = re.compile('slow request ([0-9.]+) seconds old, '
-                                          +'received at '+TSTAMP_RE
-                                          +': (.*)')
-        self.OSD_LOG_SLOWS_RE = re.compile('(\d+) slow requests, (\d+) included below; oldest blocked for > ([0-9.]+) secs')
-        self.OSD_TREE_HOST_RE = re.compile('^(-\d+)\t(\d+\.\d+)\t\thost (.*)$')
-        self.OSD_TREE_OSD_RE = re.compile('^(\d+)\t(\d+\.\d+)\t\t\t'
-                                          +'osd\.(\d+)\tup\t1\t$')
-        self.OSD_STATS_RE = re.compile('^(\d+)\t(\d+)\t(\d+)\t(\d+)\t\[([0-9,]*)\]\t\[([0-9,]*)\]$')
-        self.PG_RE = re.compile('^([0-9a-f]+\.[0-9a-f]+)\t\d+\t\d+\t\d+\t'
-                                +'\d+\t(\d+)\t\d+\t\d+\t(\S+)\t'
-                                +TSTAMP_RE+'\t'
-                                +'\d+'+"'"+'\d+\t\d+:\d+\t\[([0-9,]+)\]\t'
-                                +'(\d+)\t\[([0-9,]+)\]\t(\d+)\t'
-                                +'\d+'+"'"+'\d+\t'
-                                +TSTAMP_RE+'\t'
-                                +'\d+'+"'"+'\d+\t'
-                                +TSTAMP_RE+'$'
-        )
-
         def parse_osd_log_scrub_line(line, osdno, tstamp):
+            if not hasattr(self, 'OSD_LOG_SCRUB_RE'):
+                self.OSD_LOG_SCRUB_RE = re.compile('(.*) (deep-scrub|scrub) ok')
             m = self.OSD_LOG_SCRUB_RE.match(line)
             if m:
                 pgid=m.group(1)
@@ -167,6 +146,10 @@ class CephScrubLogAnalyzer:
             return False
 
         def parse_osd_log_slow_line(line, osdno, tstamp):
+            if not hasattr(self, 'OSD_LOG_SLOW_RE'):
+                self.OSD_LOG_SLOW_RE = re.compile('slow request ([0-9.]+) seconds old, '
+                                                  +'received at '+TSTAMP_RE
+                                                  +': (.*)')
             m = self.OSD_LOG_SLOW_RE.match(line)
             if m:
                 age = float(m.group(1))
@@ -178,12 +161,20 @@ class CephScrubLogAnalyzer:
             return False
 
         def parse_osd_log_slows_line(line, osdno, tstamp):
+            if not hasattr(self, 'OSD_LOG_SLOWS_RE'):
+                self.OSD_LOG_SLOWS_RE = re.compile('(\d+) slow requests, '
+                                                   +'(\d+) included below; '
+                                                   +'oldest blocked for > ([0-9.]+) secs')
             m = self.OSD_LOG_SLOWS_RE.match(line)
             if m:
                 return True
             return False
 
         def parse_osd_log_line(line):
+            if not hasattr(self, 'OSD_LOG_RE'):
+                self.OSD_LOG_RE = re.compile('^ */var/log/ceph/ceph-osd\.(\d+)\.log(\.\d+(\.gz)?)?:'
+                                             +TSTAMP_RE+'\s+'
+                                             +'([0-9a-f]+)\s+0 log \[(.*)\] : (.*)}?$')
             m = self.OSD_LOG_RE.match(line)
             if not m:
                 return False
@@ -220,6 +211,17 @@ class CephScrubLogAnalyzer:
 
         def parse_pg(line):
 
+            if not hasattr(self, 'PG_RE'):
+                self.PG_RE = re.compile('^([0-9a-f]+\.[0-9a-f]+)\t\d+\t\d+\t\d+\t'
+                                        +'\d+\t(\d+)\t\d+\t\d+\t(\S+)\t'
+                                        +TSTAMP_RE+'\t'
+                                        +'\d+'+"'"+'\d+\t\d+:\d+\t\[([0-9,]+)\]\t'
+                                        +'(\d+)\t\[([0-9,]+)\]\t(\d+)\t'
+                                        +'\d+'+"'"+'\d+\t'
+                                        +TSTAMP_RE+'\t'
+                                        +'\d+'+"'"+'\d+\t'
+                                        +TSTAMP_RE+'$'
+                )
             m = self.PG_RE.match(line)
             if not m:
                 return False
@@ -239,6 +241,9 @@ class CephScrubLogAnalyzer:
             return True
 
         def parse_osd_tree_host(line):
+            if not hasattr(self, 'OSD_TREE_HOST_RE'):
+                self.OSD_TREE_HOST_RE \
+                    = re.compile('^(-\d+)\t(\d+\.\d+)\t\thost (.*)$')
             m = self.OSD_TREE_HOST_RE.match(line)
             if not m:
                 return False
@@ -246,6 +251,10 @@ class CephScrubLogAnalyzer:
             return True
 
         def parse_osd_tree_osd(line):
+            if not hasattr(self, 'OSD_TREE_OSD_RE'):
+                self.OSD_TREE_OSD_RE \
+                    = re.compile('^(\d+)\t(\d+\.\d+)\t\t\t'
+                                 +'osd\.(\d+)\tup\t1\t$')
             m = self.OSD_TREE_OSD_RE.match(line)
             if not m:
                 return False
@@ -254,6 +263,10 @@ class CephScrubLogAnalyzer:
             return True
 
         def parse_osd_stats(line):
+            if not hasattr(self, 'OSD_STATS_RE'):
+                self.OSD_STATS_RE \
+                    = re.compile('^(\d+)\t(\d+)\t(\d+)\t(\d+)\t'
+                                 +'\[([0-9,]*)\]\t\[([0-9,]*)\]$')
             m = self.OSD_STATS_RE.match(line)
             if not m:
                 return False
