@@ -36,7 +36,8 @@ import sys
 from datetime import datetime
 from datetime import timedelta
 
-LOG = '20150407-scrub-logs.txt'
+#LOG = '20150407-scrub-logs.txt'
+LOG = '20150413-112504-scrub-logs.txt'
 
 SCRUB_SHALLOW = 0
 SCRUB_DEEP = 1
@@ -106,10 +107,13 @@ TSTAMP_RE = '(\d\d+-\d\d-\d\d \d\d:\d\d:\d\d)\.(\d+)'
 
 ## Estimated scrubbing rate in bytes/sec
 ##
-SCRUB_RATE_EST = 200e6
+SCRUB_RATE_EST = 80e6
 
 class CephScrubLogAnalyzer:
 
+    """A tool to analyze Ceph scrubbing schedule from logs
+
+    """
     def __init__(
             self,
             log,
@@ -130,6 +134,7 @@ class CephScrubLogAnalyzer:
         self.OSD_LOG_SLOW_RE = re.compile('slow request ([0-9.]+) seconds old, '
                                           +'received at '+TSTAMP_RE
                                           +': (.*)')
+        self.OSD_LOG_SLOWS_RE = re.compile('(\d+) slow requests, (\d+) included below; oldest blocked for > ([0-9.]+) secs')
         self.OSD_TREE_HOST_RE = re.compile('^(-\d+)\t(\d+\.\d+)\t\thost (.*)$')
         self.OSD_TREE_OSD_RE = re.compile('^(\d+)\t(\d+\.\d+)\t\t\t'
                                           +'osd\.(\d+)\tup\t1\t$')
@@ -167,8 +172,14 @@ class CephScrubLogAnalyzer:
                 age = float(m.group(1))
                 received = parse_timestamp(m.group(2), m.group(3))
                 explanation = m.group(4)
-                print("%s Slow request OSD %d [%s], age %5.2fs: %s"
-                      % (received, osdno, osd_host(osdno), age, explanation))
+                ## print("%s Slow request OSD %d [%s], age %5.2fs: %s"
+                ##       % (received, osdno, osd_host(osdno), age, explanation))
+                return True
+            return False
+
+        def parse_osd_log_slows_line(line, osdno, tstamp):
+            m = self.OSD_LOG_SLOWS_RE.match(line)
+            if m:
                 return True
             return False
 
@@ -185,6 +196,8 @@ class CephScrubLogAnalyzer:
                 if parse_osd_log_scrub_line(rest, osdno, tstamp):
                     pass
                 elif parse_osd_log_slow_line(rest, osdno, tstamp):
+                    pass
+                elif parse_osd_log_slows_line(rest, osdno, tstamp):
                     pass
                 else:
                     raise ParseError("Unrecognized OSD log line: \"%s\"" % (line))
