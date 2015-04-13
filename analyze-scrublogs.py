@@ -171,6 +171,50 @@ class CephScrubLogAnalyzer:
             return False
 
         def parse_osd_log_slow_line(line, osdno, tstamp):
+
+            def parse_slow_osd_op(msg):
+                if not hasattr(self, 'OSD_SLOW_OSD_OP_RE'):
+                    self.OSD_SLOW_OSD_OP_RE \
+                        = re.compile('osd_op\((.*)\) '
+                                     +'v4 currently '
+                                     +'(waiting for '
+                                      +'(subops from ([0-9,]+)'
+                                       +'|scrub'
+                                       +'|degraded object'
+                                      +')'
+                                      +'|started|reached pg'
+                                      +'|no flag points reached'
+                                      +'|commit sent)')
+                m = self.OSD_SLOW_OSD_OP_RE.match(msg)
+                if m:
+                    #print("osd_op: %s" % m.group(2))
+                    return True
+                return False
+
+            def parse_slow_osd_sub_op(msg):
+                if not hasattr(self, 'OSD_SLOW_OSD_SUB_OP_RE'):
+                    self.OSD_SLOW_OSD_SUB_OP_RE \
+                        = re.compile('osd_sub_op\((.*)\) '
+                                     +'v11 currently '
+                                     +'(commit sent|no flag points reached|started)')
+                m = self.OSD_SLOW_OSD_SUB_OP_RE.match(msg)
+                if m:
+                    #print("osd_sub_op: %s" % m.group(2))
+                    return True
+                return False
+
+            def parse_slow_osd_sub_op_reply(msg):
+                if not hasattr(self, 'OSD_SLOW_OSD_SUB_OP_REPLY_RE'):
+                    self.OSD_SLOW_OSD_SUB_OP_REPLY_RE \
+                        = re.compile('osd_sub_op_reply\((.*)\) '
+                                     +'v2 currently '
+                                     +'(no flag points reached)')
+                m = self.OSD_SLOW_OSD_SUB_OP_REPLY_RE.match(msg)
+                if m:
+                    #print("osd_sub_op_reply: %s" % m.group(2))
+                    return True
+                return False
+
             if not hasattr(self, 'OSD_LOG_SLOW_RE'):
                 self.OSD_LOG_SLOW_RE \
                     = re.compile('slow request ([0-9.]+) seconds old, '
@@ -180,8 +224,15 @@ class CephScrubLogAnalyzer:
                 age = float(m.group(1))
                 received = parse_timestamp(m.group(2), m.group(3))
                 explanation = m.group(4)
-                ## print("%s Slow request OSD %d [%s], age %5.2fs: %s"
-                ##       % (received, osdno, osd_host(osdno), age, explanation))
+                if parse_slow_osd_op(explanation):
+                    pass
+                elif parse_slow_osd_sub_op(explanation):
+                    pass
+                elif parse_slow_osd_sub_op_reply(explanation):
+                    pass
+                else:
+                    print("%s Slow request OSD %d [%s], age %5.2fs: %s"
+                          % (received, osdno, osd_host(osdno), age, explanation))
                 return True
             return False
 
