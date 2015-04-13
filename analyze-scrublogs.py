@@ -74,6 +74,29 @@ class PG:
                ",".join(self.hosts),
                ",".join(map(str,self.acting)))
 
+class EventLog:
+
+    """A log containing events
+
+    The event objects it stores require a "time" attribute that is
+    used as an index.
+
+    """
+
+    def __init__(
+            self):
+        self.log = dict()
+
+    def add(self, event):
+        if self.log.has_key(event.time):
+            raise Exception()   # TODO: handle multiple events at
+                                # exactly the same time
+        self.log[event.time] = event
+
+    def forward(self):
+        for time in sorted(self.log.keys()):
+            yield self.log[time]
+
 class Event:
 
     def __init__(self, time):
@@ -108,19 +131,6 @@ TSTAMP_RE = '(\d\d+-\d\d-\d\d \d\d:\d\d:\d\d)\.(\d+)'
 ## Estimated scrubbing rate in bytes/sec
 ##
 SCRUB_RATE_EST = 80e6
-
-class EventLog:
-
-    """A log containing events
-
-    """
-
-    def __init__(
-            self):
-        self.log = dict()
-
-    def add(self, event):
-        self.log[event.time] = event
 
 class CephScrubLogAnalyzer:
 
@@ -236,19 +246,19 @@ class CephScrubLogAnalyzer:
             m = self.PG_RE.match(line)
             if not m:
                 return False
-            pgid = m.group(1)
-            bytes = int(m.group(2))
-            status = m.group(5)
-            up_set = parse_osd_set(m.group(6))
-            up_primary = int(m.group(7))
+            pgid           = m.group(1)
+            bytes          = int(m.group(2))
+            status         = m.group(5)
+            up_set         = parse_osd_set(m.group(6))
+            up_primary     = int(m.group(7))
             assert(up_set[0] == up_primary)
-            acting_set = parse_osd_set(m.group(8))
+            acting_set     = parse_osd_set(m.group(8))
             acting_primary = int(m.group(9))
-            hosts = map(osd_host, acting_set)
             assert(acting_set[0] == acting_primary)
-            self.pg[pgid] = PG(pgid, bytes=bytes, \
-                               up=up_set, acting=acting_set,
-                               hosts=hosts)
+            hosts          = map(osd_host, acting_set)
+            self.pg[pgid]  = PG(pgid, bytes=bytes,
+                                up=up_set, acting=acting_set,
+                                hosts=hosts)
             return True
 
         def parse_osd_tree_host(line):
@@ -311,8 +321,7 @@ class CephScrubLogAnalyzer:
                 sys.stdout.write("?? "+line)
         print("Found %d scrubs, %d deep" % (self.scrub_count, self.deep_count))
         self.add_scrub_start_events()
-        for time in sorted(self.log.log.keys()):
-            event = self.log.log[time]
+        for event in self.log.forward():
             pg = event.pg
             print(event)
 
@@ -331,8 +340,7 @@ class CephScrubLogAnalyzer:
                                     pg=end_event.pg))
 
     def add_scrub_start_events(self):
-        for time in self.log.log.keys():
-            event = self.log.log[time]
+        for event in self.log.forward():
             if isinstance(event, ScrubEvent):
                 self.add_scrub_start_event(event)
 
