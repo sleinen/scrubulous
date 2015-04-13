@@ -128,6 +128,19 @@ class ScrubEvent(Event):
         deep_shallow = 'S' if self.scrub_type == SCRUB_SHALLOW else 'D'
         return "%s %s%s %s" % (self.time, start_end, deep_shallow, self.pg)
 
+class OSDSlowRequestEvent(Event):
+
+    """Represent a "slow request" event signaled by an OSD"""
+
+    def __init__(self, time, osdno, description):
+        self.time=time
+        self.osdno=osdno
+        self.description=description
+
+    def __str__(self):
+        return "%s slow request OSD %d: %s" \
+            % (self.time, self.osdno, self.description)
+
 def parse_scrub_type(scrub_type):
     if scrub_type == 'scrub':
         return SCRUB_SHALLOW
@@ -195,7 +208,7 @@ class CephScrubLogAnalyzer:
                                       +'|commit sent)')
                 m = self.OSD_SLOW_OSD_OP_RE.match(msg)
                 if m:
-                    #print("osd_op: %s" % m.group(2))
+                    self.log.add(OSDSlowRequestEvent(tstamp, osdno, msg))
                     return True
                 return False
 
@@ -207,7 +220,7 @@ class CephScrubLogAnalyzer:
                                      +'(commit sent|no flag points reached|started)')
                 m = self.OSD_SLOW_OSD_SUB_OP_RE.match(msg)
                 if m:
-                    #print("osd_sub_op: %s" % m.group(2))
+                    self.log.add(OSDSlowRequestEvent(tstamp, osdno, msg))
                     return True
                 return False
 
@@ -219,7 +232,7 @@ class CephScrubLogAnalyzer:
                                      +'(no flag points reached)')
                 m = self.OSD_SLOW_OSD_SUB_OP_REPLY_RE.match(msg)
                 if m:
-                    #print("osd_sub_op_reply: %s" % m.group(2))
+                    self.log.add(OSDSlowRequestEvent(tstamp, osdno, msg))
                     return True
                 return False
 
@@ -394,7 +407,6 @@ class CephScrubLogAnalyzer:
         print("Found %d scrubs, %d deep" % (self.scrub_count, self.deep_count))
         self.add_scrub_start_events()
         for event in self.log.forward():
-            pg = event.pg
             print(event)
 
     def add_scrub_start_event(self, end_event):
