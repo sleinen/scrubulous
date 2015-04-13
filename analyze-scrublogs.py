@@ -254,6 +254,14 @@ class CephScrubLogAnalyzer:
                 return True
             return False
 
+        def parse_osd_param_set_line(line, osdno, tstamp):
+            if not hasattr(self, 'OSD_PARAM_SET_RE'):
+                self.OSD_PARAM_SET_RE \
+                    = re.compile("^osd_scrub_sleep = '(.*)' ?$")
+            if self.OSD_PARAM_SET_RE.match(line):
+                return True
+            return False
+
         def parse_osd_log_line(line):
             if not hasattr(self, 'OSD_LOG_RE'):
                 self.OSD_LOG_RE \
@@ -274,6 +282,8 @@ class CephScrubLogAnalyzer:
                 elif parse_osd_log_slow_line(rest, osdno, tstamp):
                     pass
                 elif parse_osd_log_slows_line(rest, osdno, tstamp):
+                    pass
+                elif parse_osd_param_set_line(rest, osdno, tstamp):
                     pass
                 else:
                     raise ParseError("Unrecognized OSD log line: \"%s\"" % (line))
