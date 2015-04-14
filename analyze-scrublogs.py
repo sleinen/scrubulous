@@ -174,6 +174,13 @@ class CephScrubLogAnalyzer(object):
         self.scrub_rate_est = scrub_rate_est
         self.log_unknown_lines = log_unknown_lines
 
+        self.scrub_count, self.shallow_count, self.deep_count = 0, 0, 0
+        self.log = EventLog()
+        self.osd_to_host = dict()
+        self.osd_to_kb_used = dict()
+        self.pg = dict()
+        self.current_host = None
+
     def parse(self):
         def parse_osd_log_scrub_line(line, osdno, tstamp):
             if not hasattr(self, 'OSD_LOG_SCRUB_RE'):
@@ -394,11 +401,6 @@ class CephScrubLogAnalyzer(object):
             self.osd_to_kb_used[osdno] = kb_used
             return True
 
-        self.scrub_count, self.shallow_count, self.deep_count = 0, 0, 0
-        self.log = EventLog()
-        self.osd_to_host = dict()
-        self.osd_to_kb_used = dict()
-        self.pg = dict()
 
         for line in open(self.log_file_name):
             if parse_osd_log_line(line):
