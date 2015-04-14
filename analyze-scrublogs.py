@@ -1,19 +1,25 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-##
-## Analyze how your Ceph cluster performs (deep) scrubs
-##
-## Author:       Simon Leinen  <simon.leinen@switch.ch>
-## Date created: 2015-04-07
-##
-## The input file should be generated using these commands:
-##
-##   ceph osd tree
-##   ceph pg dump
-##   foreach osd_host in $osd_hosts
-##   do
-##     ssh $osd_host zgrep scrub '/var/log/ceph/ceph-osd.*.{7,6,5,4,3,2,1}.gz'
-##   done
+#
+# Analyze how your Ceph cluster performs (deep) scrubs
+#
+# Author:       Simon Leinen  <simon.leinen@switch.ch>
+# Date created: 2015-04-07
+#
+# The input file should be generated using these commands:
+#
+#   ceph osd tree
+#   ceph pg dump
+#   foreach osd_host in $osd_hosts
+#   do
+#     ssh $osd_host zgrep scrub '/var/log/ceph/ceph-osd.*.{7,6,5,4,3,2,1}.gz'
+#   done
+
+import os
+import re
+import sys
+from datetime import datetime
+from datetime import timedelta
 
 __author_name__ = "Simon Leinen"
 __author_email__ = "simon.leinen@switch.ch"
@@ -30,17 +36,11 @@ __copyright__ = (
     " %(__author_name__)s") % vars()
 __license__ = "GPL version 3"
 
-import os
-import re
-import sys
-from datetime import datetime
-from datetime import timedelta
-
-#LOG = '20150407-scrub-logs.txt'
 LOG = '20150414-004026-scrub-logs.txt'
 
 SCRUB_SHALLOW = 0
 SCRUB_DEEP = 1
+
 
 class ParseError(Exception):
     def __init__(self, msg):
@@ -49,6 +49,7 @@ class ParseError(Exception):
     def __str__(self):
         return "Parse error: %s" % (self.msg)
     pass
+
 
 class PG:
 
@@ -74,7 +75,8 @@ class PG:
             % (self.pgid,
                self.bytes * 1e-9,
                ",".join(self.hosts),
-               ",".join(map(str,self.acting)))
+               ",".join(map(str, self.acting)))
+
 
 class EventLog:
 
@@ -90,7 +92,7 @@ class EventLog:
         self.log = dict()
 
     def add(self, event):
-        if self.log.has_key(event.time):
+        if event.time in self.log:
             self.log[event.time].append(event)
         else:
             self.log[event.time] = list([event])
@@ -101,10 +103,12 @@ class EventLog:
             for ev in ev:
                 yield ev
 
+
 class Event:
 
     def __init__(self, time):
-        self.time=time
+        self.time = time
+
 
 class ScrubEvent(Event):
 
@@ -112,28 +116,30 @@ class ScrubEvent(Event):
 
     def __init__(self, time,
                  scrub_type, pg, start=0):
-        self.time=time
-        self.scrub_type=scrub_type
-        self.start=start
-        self.pg=pg
+        self.time = time
+        self.scrub_type = scrub_type
+        self.start = start
+        self.pg = pg
 
     def __str__(self):
         start_end = '<' if self.start else '>'
         deep_shallow = 'S' if self.scrub_type == SCRUB_SHALLOW else 'D'
         return "%s %s%s %s" % (self.time, start_end, deep_shallow, self.pg)
 
+
 class OSDSlowRequestEvent(Event):
 
     """Represent a "slow request" event signaled by an OSD"""
 
     def __init__(self, time, osdno, description):
-        self.time=time
-        self.osdno=osdno
-        self.description=description
+        self.time = time
+        self.osdno = osdno
+        self.description = description
 
     def __str__(self):
         return "%s slow request OSD %d: %s" \
             % (self.time, self.osdno, self.description)
+
 
 def parse_scrub_type(scrub_type):
     if scrub_type == 'scrub':
@@ -145,9 +151,10 @@ def parse_scrub_type(scrub_type):
 
 TSTAMP_RE = '(\d\d+-\d\d-\d\d \d\d:\d\d:\d\d)\.(\d+)'
 
-## Estimated scrubbing rate in bytes/sec
-##
+# Estimated scrubbing rate in bytes/sec
+#
 SCRUB_RATE_EST = 80e6
+
 
 class CephScrubLogAnalyzer:
 
@@ -161,10 +168,10 @@ class CephScrubLogAnalyzer:
             scrub_rate_est=SCRUB_RATE_EST,
             log_unknown_lines=False,
     ):
-        self.log_file_name=log
-        self.min_time=min_time
-        self.scrub_rate_est=scrub_rate_est
-        self.log_unknown_lines=log_unknown_lines
+        self.log_file_name = log
+        self.min_time = min_time
+        self.scrub_rate_est = scrub_rate_est
+        self.log_unknown_lines = log_unknown_lines
 
     def parse(self):
         def parse_osd_log_scrub_line(line, osdno, tstamp):
@@ -173,14 +180,16 @@ class CephScrubLogAnalyzer:
                     = re.compile('(.*) (deep-scrub|scrub) ok')
             m = self.OSD_LOG_SCRUB_RE.match(line)
             if m:
-                pgid=m.group(1)
+                pgid = m.group(1)
                 scrub_type = parse_scrub_type(m.group(2))
                 if scrub_type == SCRUB_SHALLOW:
                     self.shallow_count = self.shallow_count+1
                 elif scrub_type == SCRUB_DEEP:
                     self.deep_count = self.deep_count+1
                     pg = self.pg[pgid]
-                    self.log.add(ScrubEvent(tstamp, scrub_type=scrub_type, pg=pg))
+                    self.log.add(ScrubEvent(tstamp,
+                                            scrub_type=scrub_type,
+                                            pg=pg))
                 self.scrub_count = self.scrub_count+1
                 return True
             return False
@@ -190,16 +199,16 @@ class CephScrubLogAnalyzer:
             def parse_slow_osd_op(msg):
                 if not hasattr(self, 'OSD_SLOW_OSD_OP_RE'):
                     self.OSD_SLOW_OSD_OP_RE \
-                        = re.compile('osd_op\((.*)\) '
-                                     +'v4 currently '
-                                     +'(waiting for '
-                                      +'(subops from ([0-9,]+)'
-                                       +'|scrub'
-                                       +'|degraded object'
-                                      +')'
-                                      +'|started|reached pg'
-                                      +'|no flag points reached'
-                                      +'|commit sent)')
+                        = re.compile('osd_op\((.*)\) ' +
+                                     'v4 currently ' +
+                                     '(waiting for ' +
+                                     '(subops from ([0-9,]+)' +
+                                     '|scrub' +
+                                     '|degraded object' +
+                                     ')' +
+                                     '|started|reached pg' +
+                                     '|no flag points reached' +
+                                     '|commit sent)')
                 m = self.OSD_SLOW_OSD_OP_RE.match(msg)
                 if m:
                     self.log.add(OSDSlowRequestEvent(tstamp, osdno, msg))
@@ -209,9 +218,10 @@ class CephScrubLogAnalyzer:
             def parse_slow_osd_sub_op(msg):
                 if not hasattr(self, 'OSD_SLOW_OSD_SUB_OP_RE'):
                     self.OSD_SLOW_OSD_SUB_OP_RE \
-                        = re.compile('osd_sub_op\((.*)\) '
-                                     +'v11 currently '
-                                     +'(commit sent|no flag points reached|started)')
+                        = re.compile('osd_sub_op\((.*)\) ' +
+                                     'v11 currently ' +
+                                     '(commit sent' +
+                                     '|no flag points reached|started)')
                 m = self.OSD_SLOW_OSD_SUB_OP_RE.match(msg)
                 if m:
                     self.log.add(OSDSlowRequestEvent(tstamp, osdno, msg))
@@ -221,9 +231,9 @@ class CephScrubLogAnalyzer:
             def parse_slow_osd_sub_op_reply(msg):
                 if not hasattr(self, 'OSD_SLOW_OSD_SUB_OP_REPLY_RE'):
                     self.OSD_SLOW_OSD_SUB_OP_REPLY_RE \
-                        = re.compile('osd_sub_op_reply\((.*)\) '
-                                     +'v2 currently '
-                                     +'(no flag points reached)')
+                        = re.compile('osd_sub_op_reply\((.*)\) ' +
+                                     'v2 currently ' +
+                                     '(no flag points reached)')
                 m = self.OSD_SLOW_OSD_SUB_OP_REPLY_RE.match(msg)
                 if m:
                     self.log.add(OSDSlowRequestEvent(tstamp, osdno, msg))
@@ -232,8 +242,8 @@ class CephScrubLogAnalyzer:
 
             if not hasattr(self, 'OSD_LOG_SLOW_RE'):
                 self.OSD_LOG_SLOW_RE \
-                    = re.compile('slow request ([0-9.]+) seconds old, '
-                                 +'received at '+TSTAMP_RE+': (.*)')
+                    = re.compile('slow request ([0-9.]+) seconds old, ' +
+                                 'received at ' + TSTAMP_RE + ': (.*)')
             m = self.OSD_LOG_SLOW_RE.match(line)
             if m:
                 age = float(m.group(1))
@@ -247,15 +257,17 @@ class CephScrubLogAnalyzer:
                     pass
                 else:
                     print("%s Slow request OSD %d [%s], age %5.2fs: %s"
-                          % (received, osdno, osd_host(osdno), age, explanation))
+                          % (received, osdno, osd_host(osdno),
+                             age, explanation))
                 return True
             return False
 
         def parse_osd_log_slows_line(line, osdno, tstamp):
             if not hasattr(self, 'OSD_LOG_SLOWS_RE'):
                 self.OSD_LOG_SLOWS_RE \
-                    = re.compile('(\d+) slow requests, (\d+) included below; '
-                                 +'oldest blocked for > ([0-9.]+) secs')
+                    = re.compile('(\d+) slow requests, ' +
+                                 '(\d+) included below; ' +
+                                 'oldest blocked for > ([0-9.]+) secs')
             m = self.OSD_LOG_SLOWS_RE.match(line)
             if m:
                 return True
@@ -272,9 +284,9 @@ class CephScrubLogAnalyzer:
         def parse_osd_log_line(line):
             if not hasattr(self, 'OSD_LOG_RE'):
                 self.OSD_LOG_RE \
-                    = re.compile('^ */var/log/ceph/ceph-osd\.(\d+)\.log(\.\d+(\.gz)?)?:'
-                                 +TSTAMP_RE+'\s+'
-                                 +'([0-9a-f]+)\s+0 log \[(.*)\] : (.*)}?$')
+                    = re.compile('^ */.*/ceph-osd\.(\d+)\.log' +
+                                 '(\.\d+(\.gz)?)?:' + TSTAMP_RE + '\s+' +
+                                 '([0-9a-f]+)\s+0 log \[(.*)\] : (.*)}?$')
             m = self.OSD_LOG_RE.match(line)
             if not m:
                 return False
@@ -293,12 +305,13 @@ class CephScrubLogAnalyzer:
                 elif parse_osd_param_set_line(rest, osdno, tstamp):
                     pass
                 else:
-                    raise ParseError("Unrecognized OSD log line: \"%s\"" % (line))
+                    raise ParseError("Unrecognized OSD log line: \"%s\""
+                                     % (line))
             return True
 
         def parse_timestamp(ymdhms, usec):
             return datetime.strptime(ymdhms, "%Y-%m-%d %H:%M:%S") \
-                +timedelta(microseconds=int(usec))
+                + timedelta(microseconds=int(usec))
 
         def parse_osd_set(s):
             # split()ting an empty string does not return the empty
@@ -315,29 +328,30 @@ class CephScrubLogAnalyzer:
 
             if not hasattr(self, 'PG_RE'):
                 self.PG_RE \
-                    = re.compile('^([0-9a-f]+\.[0-9a-f]+)\t\d+\t\d+\t\d+\t'
-                                 +'(\d+)\t(\d+)\t\d+\t\d+\t(\S+)\t'+TSTAMP_RE
-                                 +'\t\d+'+"'"+'\d+\t\d+:\d+\t\[([0-9,]+)\]\t'
-                                 +'(\d+)\t\[([0-9,]+)\]\t(\d+)\t\d+'+"'"+'\d+\t'
-                                 +TSTAMP_RE+'\t\d+'+"'"+'\d+\t'+TSTAMP_RE+'$'
-                    )
+                    = re.compile('^([0-9a-f]+\.[0-9a-f]+)\t\d+\t\d+\t\d+\t' +
+                                 '(\d+)\t(\d+)\t\d+\t\d+\t(\S+)\t' +
+                                 TSTAMP_RE + '\t\d+' + "'" +
+                                 '\d+\t\d+:\d+\t\[([0-9,]+)\]\t' +
+                                 '(\d+)\t\[([0-9,]+)\]\t(\d+)\t\d+' + "'" +
+                                 '\d+\t' + TSTAMP_RE + '\t\d+' + "'" +
+                                 '\d+\t' + TSTAMP_RE + '$')
             m = self.PG_RE.match(line)
             if not m:
                 return False
-            pgid           = m.group(1)
-            objects        = int(m.group(2))
-            bytes          = int(m.group(3))
-            status         = m.group(6)
-            up_set         = parse_osd_set(m.group(7))
-            up_primary     = int(m.group(8))
+            pgid = m.group(1)
+            objects = int(m.group(2))
+            bytes = int(m.group(3))
+            status = m.group(6)
+            up_set = parse_osd_set(m.group(7))
+            up_primary = int(m.group(8))
             assert(up_set[0] == up_primary)
-            acting_set     = parse_osd_set(m.group(9))
+            acting_set = parse_osd_set(m.group(9))
             acting_primary = int(m.group(10))
             assert(acting_set[0] == acting_primary)
-            hosts          = map(osd_host, acting_set)
-            self.pg[pgid]  = PG(pgid, objects=objects, bytes=bytes,
-                                up=up_set, acting=acting_set,
-                                hosts=hosts)
+            hosts = map(osd_host, acting_set)
+            self.pg[pgid] = PG(pgid, objects=objects, bytes=bytes,
+                               up=up_set, acting=acting_set,
+                               hosts=hosts)
             return True
 
         def parse_osd_tree_host(line):
@@ -353,8 +367,8 @@ class CephScrubLogAnalyzer:
         def parse_osd_tree_osd(line):
             if not hasattr(self, 'OSD_TREE_OSD_RE'):
                 self.OSD_TREE_OSD_RE \
-                    = re.compile('^(\d+)\t(\d+\.\d+)\t\t\t'
-                                 +'osd\.(\d+)\tup\t1\t$')
+                    = re.compile('^(\d+)\t(\d+\.\d+)\t\t\t' +
+                                 'osd\.(\d+)\tup\t1\t$')
             m = self.OSD_TREE_OSD_RE.match(line)
             if not m:
                 return False
@@ -365,8 +379,8 @@ class CephScrubLogAnalyzer:
         def parse_osd_stats(line):
             if not hasattr(self, 'OSD_STATS_RE'):
                 self.OSD_STATS_RE \
-                    = re.compile('^(\d+)\t(\d+)\t(\d+)\t(\d+)\t'
-                                 +'\[([0-9,]*)\]\t\[([0-9,]*)\]$')
+                    = re.compile('^(\d+)\t(\d+)\t(\d+)\t(\d+)\t' +
+                                 '\[([0-9,]*)\]\t\[([0-9,]*)\]$')
             m = self.OSD_STATS_RE.match(line)
             if not m:
                 return False
@@ -406,7 +420,7 @@ class CephScrubLogAnalyzer:
     def add_scrub_start_event(self, end_event):
 
         def est_scrub_duration(size):
-            scrub_init_duration=1
+            scrub_init_duration = 1
             usec = size/(self.scrub_rate_est/1e6)+scrub_init_duration
             return timedelta(microseconds=usec)
         if end_event.scrub_type == SCRUB_DEEP:
@@ -423,5 +437,5 @@ class CephScrubLogAnalyzer:
                 self.add_scrub_start_event(event)
 
 ana = CephScrubLogAnalyzer(log=LOG,
-                           min_time=datetime(2015,04,01))
+                           min_time=datetime(2015, 04, 01))
 ana.parse()
