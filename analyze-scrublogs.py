@@ -44,6 +44,7 @@ SCRUB_DEEP = 1
 
 class ParseError(Exception):
     def __init__(self, msg):
+        super(ParseError, self).__init__()
         self.msg = msg
 
     def __str__(self):
@@ -51,7 +52,7 @@ class ParseError(Exception):
     pass
 
 
-class PG:
+class PG(object):
 
     """Ceph placement group"""
 
@@ -78,7 +79,7 @@ class PG:
                ",".join(map(str, self.acting)))
 
 
-class EventLog:
+class EventLog(object):
 
     """A log containing events
 
@@ -104,7 +105,7 @@ class EventLog:
                 yield ev
 
 
-class Event:
+class Event(object):
 
     def __init__(self, time):
         self.time = time
@@ -116,7 +117,7 @@ class ScrubEvent(Event):
 
     def __init__(self, time,
                  scrub_type, pg, start=0):
-        self.time = time
+        super(ScrubEvent, self).__init__(time)
         self.scrub_type = scrub_type
         self.start = start
         self.pg = pg
@@ -132,7 +133,7 @@ class OSDSlowRequestEvent(Event):
     """Represent a "slow request" event signaled by an OSD"""
 
     def __init__(self, time, osdno, description):
-        self.time = time
+        super(OSDSlowRequestEvent, self).__init__(time)
         self.osdno = osdno
         self.description = description
 
@@ -156,7 +157,7 @@ TSTAMP_RE = r'(\d\d+-\d\d-\d\d \d\d:\d\d:\d\d)\.(\d+)'
 SCRUB_RATE_EST = 80e6
 
 
-class CephScrubLogAnalyzer:
+class CephScrubLogAnalyzer(object):
 
     """A tool to analyze Ceph scrubbing schedule from logs
 
