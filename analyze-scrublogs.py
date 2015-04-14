@@ -37,7 +37,7 @@ from datetime import datetime
 from datetime import timedelta
 
 #LOG = '20150407-scrub-logs.txt'
-LOG = '20150413-181724-scrub-logs.txt'
+LOG = '20150414-004026-scrub-logs.txt'
 
 SCRUB_SHALLOW = 0
 SCRUB_DEEP = 1
@@ -98,11 +98,8 @@ class EventLog:
     def forward(self):
         for time in sorted(self.log.keys()):
             ev = self.log[time]
-            if isinstance(ev, Event):
+            for ev in ev:
                 yield ev
-            else:
-                for ev in ev:
-                    yield ev
 
 class Event:
 
